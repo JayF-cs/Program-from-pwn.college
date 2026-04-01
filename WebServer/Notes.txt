@@ -1,0 +1,103 @@
+<32;13;11MAssembly webserver is basically:
+1. Create a socket
+2. Bind it to a port
+3. Listen for connections
+4. Accept a client
+5. Read HTTP request
+6. Write HTTP response
+7. Close connection
+8. Loop forever
+
+Linux x86_64 syscall convention:
+rax = syscall number
+rdi = arg1
+rsi = arg2
+rdx = arg3
+r10 = arg4
+r8  = arg5
+r9  = arg6
+
+Open:
+int open(const char *pathname, int flags, int mode);
+mov rdi, buffer        ; pointer to "/flag"
+mov rsi, 0             ; O_RDONLY
+mov rdx, 0             ; mode (unused here)
+mov rax, 2             ; syscall: open
+syscall
+Result is file descriptor returned in rax
+
+Read:
+ssize_t read(int fd, void *buf, size_t count);
+mov rdi, fd
+mov rsi, buffer
+mov rdx, size
+mov rax, 0             ; syscall: read
+syscall
+
+Write:
+ssize_t write(int fd, void *buf, size_t count);
+mov rdi, fd
+mov rsi, buffer
+mov rdx, size
+mov rax, 1             ; syscall: write
+syscall
+
+Network Syscalls:
+Socket:
+int socket(int domain, int type, int protocol);
+mov rdi, 2     ; AF_INET
+mov rsi, 1     ; SOCK_STREAM (TCP)
+mov rdx, 0     ; IPPROTO_IP
+mov rax, 41    ; syscall: socket
+syscall
+Returns socket fd usually 3
+
+Bind:
+int bind(int sockfd, struct sockaddr *addr, socklen_t addrlen);
+struct sockaddr_in {
+    short sin_family;   // AF_INET (2)
+    short sin_port;     // port (In big endian)
+    int   sin_addr;     // IP address
+    char  padding[8];
+}; <---- Have to manually build this :(
+
+Listen:
+mov rdi, sockfd
+mov rsi, 0        ; backlog
+mov rax, 50       ; syscall: listen
+syscall
+
+Accept:
+mov rdi, sockfd
+mov rsi, 0        ; NULL
+mov rdx, 0        ; NULL
+mov rax, 43       ; syscall: accept
+syscall
+Returns new client fd
+
+HTTP:
+Minimal Response
+HTTP/1.0 200 OK\r\n
+\r\n
+Hello
+mov rdi, client_fd
+mov rsi, response
+mov rdx, response_len
+mov rax, 1          ; write
+syscall
+
+Multiprocessing:
+Fork creates a new process
+Without fork only one request can be handled at a time
+With fork
+accept()
+
+fork()
+
+if child:
+    handle client
+    exit
+
+if parent:
+    close client socket
+    continue loop
